@@ -28,24 +28,27 @@ namespace GameRes.Formats.Kid
             }
 
             file.Seek(0x14, SeekOrigin.Begin);
-            if (file.ReadUInt16() != 256)
+            if ((file.ReadUInt16() & 0x7FFF) != 256)
             {
                 return null;
             }
             uint sign = file.ReadUInt16();
             uint dy;
             bool sliced = true;
-            if (sign == 0x17)
+            if (sign == 0x17 || sign == 0x19 || sign == 0x1F || sign == 0x25 || sign == 0x2E || sign == 0x34)
             {
+                //sign = focusT / 2
                 dy = 16;
             }
             else if (sign == 0x13)
             {
+                //sign = focusT / 2
                 dy = 16;
                 sliced = false;
             }
-            else if (sign == 0x16)
+            else if (sign == 0x16 || sign == 0x20 || sign == 0x2A)
             {
+                //sign = focusT * 2
                 dy = 32;
             }
             else
@@ -57,13 +60,16 @@ namespace GameRes.Formats.Kid
             file.Seek(0x88, SeekOrigin.Begin);
             uint width = file.ReadUInt16();
             uint height = file.ReadUInt16();
-            if (width >= 1280 || height >= 1280 || width == 0 || height == 0) // suppose not so large
+            if (width > 2560 || height > 1440 || width < 16 || height < 16) // suppose not so large
                 return null;
 
             file.Seek(0x90, SeekOrigin.Begin);
-            uint size = file.ReadUInt32();
-            size &= 0x00FFFFFF;
-            if (sign == 0x13 && size != (file.Length - 0x100) || sign == 0x17 && size != (file.Length - 0x100)* 2)
+            //uint size = file.ReadUInt32(); // not size
+            uint sizesign = file.ReadUInt16();
+            uint sizesign_high = file.ReadUInt16();
+            //size &= 0x00FFFFFF;
+            //if (sign == 0x13 && size != (file.Length - 0x100) || sign == 0x17 && size != (file.Length - 0x100)* 2)
+            if (sizesign != 0 || sizesign_high == 0)
             {
                 return null;
             }
