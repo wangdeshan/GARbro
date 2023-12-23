@@ -20,7 +20,7 @@ namespace GameRes.Formats.Kid
             uint header = file.ReadUInt32();
             if (header == 9)
             {
-                throw new NotSupportedException(string.Format("BIP Chara format not supported."));
+                return null;//throw new NotSupportedException(string.Format("BIP Chara format not supported."));
             }
             else if (header != 5)
             {
@@ -33,18 +33,18 @@ namespace GameRes.Formats.Kid
                 return null;
             }
             uint sign = file.ReadUInt16();
-            uint dy = 0;
+            uint dy;
             bool sliced = true;
             if (sign == 0x17)
             {
                 dy = 16;
             }
-            else if (sign == 0x16)
+            else if (sign == 0x13)
             {
                 dy = 16;
                 sliced = false;
             }
-            else if (sign == 0x13)
+            else if (sign == 0x16)
             {
                 dy = 32;
             }
@@ -57,7 +57,7 @@ namespace GameRes.Formats.Kid
             file.Seek(0x88, SeekOrigin.Begin);
             uint width = file.ReadUInt16();
             uint height = file.ReadUInt16();
-            if (width >= 1280 || height >= 1280) // suppose not so large
+            if (width >= 1280 || height >= 1280 || width == 0 || height == 0) // suppose not so large
                 return null;
 
             file.Seek(0x90, SeekOrigin.Begin);
