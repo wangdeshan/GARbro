@@ -33,7 +33,8 @@ namespace GameRes
 {
     public static class Encodings
     {
-        public static readonly Encoding cp932 = Encoding.GetEncoding (932);
+        public static readonly Encoding cp932 = Encoding.GetEncoding(932);
+        public static readonly Encoding ASCII = Encoding.GetEncoding(32765);
 
         public static Encoding WithFatalFallback (this Encoding enc)
         {
