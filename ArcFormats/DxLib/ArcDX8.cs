@@ -90,14 +90,18 @@ namespace GameRes.Formats.DxLib
             //TODO: Ask for key here.
           
             var key = DefaultKey;
-            if ((dx.Flags & DXA8Flags.DXA_FLAG_NO_HEAD_PRESS) != 0)
+            if ((dx.Flags & DXA8Flags.DXA_FLAG_NO_KEY) == 0)
             {
-                var index = file.View.ReadBytes(dx.IndexOffset, dx.IndexSize);
-                Decrypt(index, 0, index.Length, 0, key);
-            } else
-            {
-                //input is compressed. First by huffman then by LZ. if it's also encrypted then we're stuck.
-                throw new NotImplementedException();
+                if ((dx.Flags & DXA8Flags.DXA_FLAG_NO_HEAD_PRESS) != 0)
+                {
+                    var index = file.View.ReadBytes(dx.IndexOffset, dx.IndexSize);
+                    Decrypt(index, 0, index.Length, 0, key);
+                }
+                else
+                {
+                    //input is compressed. First by huffman then by LZ. if it's also encrypted then we're stuck.
+                    throw new NotImplementedException();
+                }
             }
             // decrypt-2
             // decompress
