@@ -90,11 +90,12 @@ namespace GameRes.Formats.DxLib
             //TODO: Ask for key here.
           
             var key = DefaultKey;
+
+            var index = file.View.ReadBytes(dx.IndexOffset, dx.IndexSize);
             if ((dx.Flags & DXA8Flags.DXA_FLAG_NO_KEY) == 0)
             {
                 if ((dx.Flags & DXA8Flags.DXA_FLAG_NO_HEAD_PRESS) != 0)
                 {
-                    var index = file.View.ReadBytes(dx.IndexOffset, dx.IndexSize);
                     Decrypt(index, 0, index.Length, 0, key);
                 }
                 else
