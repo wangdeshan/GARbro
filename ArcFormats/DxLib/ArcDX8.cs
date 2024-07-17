@@ -23,14 +23,21 @@
 // IN THE SOFTWARE.
 //
 
+using GameRes.Formats.PkWare;
+using GameRes.Formats.Strings;
+using NAudio.SoundFont;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.IO;
+using System.Linq;
+
+
+
 
 namespace GameRes.Formats.DxLib
 {
-    [Export(typeof(ArchiveFormat))]
+        [Export(typeof(ArchiveFormat))]
     public class Dx8Opener : DxOpener
     {
         public override string         Tag { get { return "BIN/DXLIB"; } }
@@ -51,14 +58,10 @@ namespace GameRes.Formats.DxLib
         DxScheme DefaultScheme = new DxScheme { KnownKeys = new List<IDxKey>() };
 
 
-        internal struct DxHeaderV8
+        internal class DxHeaderV8 :DxHeader
         {
-            public long BaseOffset;
-            public long IndexOffset;
-            public uint IndexSize;
-            public long FileTable;
-            public long DirTable;
-            public int CodePage;
+            new public long FileTable;
+            new public long DirTable;
             public DXA8Flags Flags;
             public byte HuffmanKB;
             //15 bytes of padding.
@@ -67,7 +70,44 @@ namespace GameRes.Formats.DxLib
         internal enum DXA8Flags : UInt32
         {
             DXA_FLAG_NO_KEY=1, //file is not encrypted
-            DXA_FLAG_NO_HEAD_PRESS=1<<1, //do not compress headers
+            DXA_FLAG_NO_HEAD_PRESS=1<<1, //do not compress the entire file after compressing individual entries
+        }
+
+        [Serializable]
+        public class DXAOpts : ResourceOptions
+        {
+            public string Keyword;
+        }
+
+        public override ResourceOptions GetDefaultOptions()
+        {
+            return new DXAOpts
+            {
+                Keyword = Properties.Settings.Default.DXAPassword
+            };
+        }
+
+        string QueryPassword(ArcView file)
+        {
+            var options = Query<DXAOpts>(arcStrings.ZIPEncryptedNotice);
+            return options.Keyword;
+        }
+
+        public override ResourceOptions GetOptions(object widget)
+        {
+            if (widget is GUI.WidgetDXA)
+            {
+                return new DXAOpts
+                {
+                    Keyword = ((GUI.WidgetDXA)widget).Password.Text
+                };
+            }
+            return GetDefaultOptions();
+        }
+
+        public override object GetAccessWidget()
+        {
+            return new GUI.WidgetDXA();
         }
 
         public override ArcFile TryOpen (ArcView file)
@@ -84,29 +124,105 @@ namespace GameRes.Formats.DxLib
             };
             if (dx.DirTable >= dx.IndexSize || dx.FileTable >= dx.IndexSize)
                 return null;
-            //at this point we cannot proceed without user input. If NO_HEAD_PRESS is set we could maybe restore the 7-byte key
-            //Otherwise (assuming the archive is encrypted) we have no way to continue without user input.
-
-            //TODO: Ask for key here.
-          
-            var key = DefaultKey;
-
-            var index = file.View.ReadBytes(dx.IndexOffset, dx.IndexSize);
-            if ((dx.Flags & DXA8Flags.DXA_FLAG_NO_KEY) == 0)
+            DxKey8 key = null;
+            
+            //FIXME: ReadBytes sets hard cap of filesize to 4GB.
+            var bodyBuffer = file.View.ReadBytes(dx.BaseOffset, (uint)(file.MaxOffset-dx.BaseOffset));
+            bool isencrypted = (dx.Flags & DXA8Flags.DXA_FLAG_NO_KEY) == 0;
+           
+            if (isencrypted)
             {
-                if ((dx.Flags & DXA8Flags.DXA_FLAG_NO_HEAD_PRESS) != 0)
+                var keyStr = Query<DXAOpts>(arcStrings.ZIPEncryptedNotice).Keyword;
+                key = new DxKey8(keyStr);
+                Decrypt(bodyBuffer, 0, bodyBuffer.Length, 0, key.Key);
+
+                
+            }
+            //Decrypted but might be compressed
+            if ((dx.Flags & DXA8Flags.DXA_FLAG_NO_HEAD_PRESS) == 0)
+            {
+                //IndexSize refers to uncompressed 
+                throw new NotImplementedException();
+            }
+            
+            var readyStr = new MemoryStream(bodyBuffer);
+            ArcView arcView = new ArcView(readyStr, "body",(uint) bodyBuffer.LongLength);
+            List<Entry> entries;
+            using (var indexStr = arcView.CreateStream(dx.IndexOffset,dx.IndexSize))
+            using (var reader = IndexReader.Create(dx, 8, indexStr))
+            {
+                 entries = reader.Read();
+            }
+            return new DxArchive(arcView, this,entries ,key, 8);
+            //return null;
+        }
+    }
+
+    internal sealed class IndexReaderV8 : IndexReader
+    {
+        readonly int m_entry_size;
+        public IndexReaderV8(DxHeader header, int version, Stream input) : base(header, version, input)
+        {
+            m_entry_size = 0x48;
+        }
+        private class DxDirectory
+        {
+            public long DirOffset;
+            public long ParentDirOffset;
+            public int FileCount;
+            public long FileTable;
+        }
+
+        DxDirectory ReadDirEntry()
+        {
+            var dir = new DxDirectory();
+            dir.DirOffset = m_input.ReadInt64();
+            dir.ParentDirOffset = m_input.ReadInt64();
+            dir.FileCount = (int)m_input.ReadInt64();
+            dir.FileTable = m_input.ReadInt64();
+            return dir;
+        }
+
+        protected override void ReadFileTable(string root, long table_offset)
+        {
+            m_input.Position = m_header.DirTable + table_offset;
+            var dir = ReadDirEntry();
+            if (dir.DirOffset != -1 && dir.ParentDirOffset != -1)
+            {
+                m_input.Position = m_header.FileTable + dir.DirOffset;
+                root = Path.Combine(root, ExtractFileName(m_input.ReadInt64()));
+            }
+            long current_pos = m_header.FileTable + dir.FileTable;
+            for (int i = 0; i < dir.FileCount; ++i)
+            {
+                m_input.Position = current_pos;
+                var name_offset = m_input.ReadInt64();
+                uint attr = (uint)m_input.ReadInt64();
+                m_input.Seek(0x18, SeekOrigin.Current);
+                var offset = m_input.ReadInt64();
+                if (0 != (attr & 0x10)) // FILE_ATTRIBUTE_DIRECTORY
                 {
-                    Decrypt(index, 0, index.Length, 0, key);
+                    if (0 == offset || table_offset == offset)
+                        throw new InvalidFormatException("Infinite recursion in DXA directory index");
+                    ReadFileTable(root, offset);
                 }
                 else
                 {
-                    //input is compressed. First by huffman then by LZ. if it's also encrypted then we're stuck.
-                    throw new NotImplementedException();
+                    var size = m_input.ReadInt64();
+                    var packed_size = m_input.ReadInt64();
+                    var huffman_packed_size = m_input.ReadInt64();
+                    var entry = FormatCatalog.Instance.Create<PackedEntry>(Path.Combine(root, ExtractFileName(name_offset)));
+                    entry.Offset = m_header.BaseOffset + offset;
+                    entry.UnpackedSize = (uint)size;
+                    entry.IsPacked = (-1 != packed_size) || -1 != huffman_packed_size;
+                    if (entry.IsPacked)
+                        entry.Size = (uint)(huffman_packed_size!=-1 ? huffman_packed_size:packed_size);
+                    else
+                        entry.Size = (uint)size;
+                    m_dir.Add(entry);
                 }
+                current_pos += m_entry_size;
             }
-            // decrypt-2
-            // decompress
-            return null;
         }
     }
 }

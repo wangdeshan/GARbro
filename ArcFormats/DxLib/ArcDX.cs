@@ -198,7 +198,7 @@ namespace GameRes.Formats.DxLib
             }
         }
 
-        byte[] Unpack (Stream stream)
+        protected byte[] Unpack (Stream stream)
         {
             using (var input = new ArcView.Reader (stream))
             {
@@ -262,7 +262,7 @@ namespace GameRes.Formats.DxLib
             }
         }
 
-        List<Entry> ReadIndex (ArcView file, int version, byte[] key)
+        protected List<Entry> ReadIndex (ArcView file, int version, byte[] key)
         {
             DxHeader dx = null;
             if (version <= 4)
@@ -313,12 +313,15 @@ namespace GameRes.Formats.DxLib
 
         internal static void Decrypt (byte[] data, int index, int count, long offset, byte[] key)
         {
-            int key_pos = (int)(offset % key.Length);
-            for (int i = 0; i < count; ++i)
+            if (key.Length !=0)
             {
-                data[index+i] ^= key[key_pos++];
-                if (key.Length == key_pos)
-                    key_pos = 0;
+                int key_pos = (int)(offset % key.Length);
+                for (int i = 0; i < count; ++i)
+                {
+                    data[index + i] ^= key[key_pos++];
+                    if (key.Length == key_pos)
+                        key_pos = 0;
+                }
             }
         }
 
@@ -361,8 +364,10 @@ namespace GameRes.Formats.DxLib
         {
             if (version <= 4)
                 return new IndexReaderV2 (header, version, input);
-            else if (version >= 6)
+            else if (version >= 6 && version < 8)
                 return new IndexReaderV6 (header, version, input);
+            else if (version >=8)
+                return new IndexReaderV8 (header, version, input);
             else
                 throw new InvalidFormatException ("Not supported DX archive version.");
         }
@@ -545,7 +550,7 @@ namespace GameRes.Formats.DxLib
             : base (stream, leave_open)
         {
             m_key = key;
-            m_base_pos = (int)(base_position % m_key.Length);
+            m_base_pos = m_key.Length !=0 ?(int)(base_position % m_key.Length):0;
         }
 
         public override int Read (byte[] buffer, int offset, int count)
@@ -559,32 +564,48 @@ namespace GameRes.Formats.DxLib
 
         public override int ReadByte ()
         {
-            int key_pos = (int)((m_base_pos + Position) % m_key.Length);
             int b = BaseStream.ReadByte();
-            if (-1 != b)
+            if (m_key.Length !=0)
             {
-                b ^= m_key[key_pos];
+                int key_pos = (int)((m_base_pos + Position) % m_key.Length);
+                if (-1 != b)
+                {
+                    b ^= m_key[key_pos];
+                }
             }
             return b;
         }
 
         public override void Write (byte[] buffer, int offset, int count)
         {
-            int key_pos = (int)((m_base_pos + Position) % m_key.Length);
+
             byte[] write_buf = new byte[count];
-            for (int i = 0; i < count; ++i)
+            if (m_key.Length != 0)
             {
-                write_buf[i] = (byte)(buffer[offset+i] ^ m_key[key_pos++]);
-                if (m_key.Length == key_pos)
-                    key_pos = 0;
+                int key_pos = (int)((m_base_pos + Position) % m_key.Length);
+                for (int i = 0; i < count; ++i)
+                {
+                    write_buf[i] = (byte)(buffer[offset + i] ^ m_key[key_pos++]);
+                    if (m_key.Length == key_pos)
+                        key_pos = 0;
+                }
+            } else
+            {
+                write_buf = buffer;
             }
             BaseStream.Write (write_buf, 0, count);
         }
 
         public override void WriteByte (byte value)
         {
-            int key_pos = (int)((m_base_pos + Position) % m_key.Length);
-            BaseStream.WriteByte ((byte)(value ^ m_key[key_pos]));
+            if(m_key.Length != 0)
+            {
+                int key_pos = (int)((m_base_pos + Position) % m_key.Length);
+                BaseStream.WriteByte((byte)(value ^ m_key[key_pos]));
+            } else
+            {
+                BaseStream.WriteByte ((byte)value);
+            }
         }
     }
 }
