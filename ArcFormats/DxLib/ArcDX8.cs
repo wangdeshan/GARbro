@@ -70,7 +70,7 @@ namespace GameRes.Formats.DxLib
         internal enum DXA8Flags : UInt32
         {
             DXA_FLAG_NO_KEY=1, //file is not encrypted
-            DXA_FLAG_NO_HEAD_PRESS=1<<1, //do not compress the entire file after compressing individual entries
+            DXA_FLAG_NO_HEAD_PRESS=1<<1, //do not compress the header after compressing individual entries
         }
 
         [Serializable]
@@ -127,28 +127,30 @@ namespace GameRes.Formats.DxLib
             DxKey8 key = null;
             
             //FIXME: ReadBytes sets hard cap of filesize to 4GB.
-            var bodyBuffer = file.View.ReadBytes(dx.BaseOffset, (uint)(file.MaxOffset-dx.BaseOffset));
+            var headerBuffer = file.View.ReadBytes(dx.IndexOffset, (uint)(file.MaxOffset-dx.IndexOffset));
             bool isencrypted = (dx.Flags & DXA8Flags.DXA_FLAG_NO_KEY) == 0;
            
             if (isencrypted)
             {
                 var keyStr = Query<DXAOpts>(arcStrings.ZIPEncryptedNotice).Keyword;
                 key = new DxKey8(keyStr);
-                Decrypt(bodyBuffer, 0, bodyBuffer.Length, 0, key.Key);
 
                 
             }
+
+            Decrypt(headerBuffer, 0, headerBuffer.Length, 0, key.Key);
             //Decrypted but might be compressed
             if ((dx.Flags & DXA8Flags.DXA_FLAG_NO_HEAD_PRESS) == 0)
             {
-                //IndexSize refers to uncompressed 
+                //IndexSize refers to uncompressed size of the header (that is FileName + File + Dir buffers)
                 throw new NotImplementedException();
             }
+
             
-            var readyStr = new MemoryStream(bodyBuffer);
-            ArcView arcView = new ArcView(readyStr, "body",(uint) bodyBuffer.LongLength);
+            var readyStr = new MemoryStream(headerBuffer);
+            ArcView arcView = new ArcView(readyStr, "hdr",(uint)headerBuffer.LongLength);
             List<Entry> entries;
-            using (var indexStr = arcView.CreateStream(dx.IndexOffset,dx.IndexSize))
+            using (var indexStr = arcView.CreateStream(dx.IndexOffset, dx.IndexSize))
             using (var reader = IndexReader.Create(dx, 8, indexStr))
             {
                  entries = reader.Read();
