@@ -26,6 +26,7 @@
 using System;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Text;
 using System.Xml.Linq;
 using GameRes.Utility;
 
@@ -183,8 +184,8 @@ namespace GameRes.Formats.DxLib
             oddString = string.Concat(keyword.Where((c, i) => i % 2 == 0));
             evenString = string.Concat(keyword.Where((c, i) => (i+1) % 2 == 0));
             UInt32 crc_0, crc_1;
-            crc_0 = Crc32.Compute(Encodings.ASCII.GetBytes(oddString), 0, oddString.Length);
-            crc_1 = Crc32.Compute(Encodings.ASCII.GetBytes(evenString), 0, evenString.Length);
+            crc_0 = Crc32.Compute(Encoding.ASCII.GetBytes(oddString), 0, oddString.Length);
+            crc_1 = Crc32.Compute(Encoding.ASCII.GetBytes(evenString), 0, evenString.Length);
             byte[] crc_0_Bytes = BitConverter.GetBytes(crc_0),crc_1_Bytes=BitConverter.GetBytes(crc_1);
             key[0] = crc_0_Bytes[0];
             key[1] = crc_0_Bytes[1];

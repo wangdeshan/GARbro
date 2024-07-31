@@ -313,8 +313,8 @@ namespace GameRes.Formats.DxLib
 
         internal static void Decrypt (byte[] data, int index, int count, long offset, byte[] key)
         {
-            if (key.Length !=0)
-            {
+            if (key.Length == 0)
+                return;
                 int key_pos = (int)(offset % key.Length);
                 for (int i = 0; i < count; ++i)
                 {
@@ -322,7 +322,6 @@ namespace GameRes.Formats.DxLib
                     if (key.Length == key_pos)
                         key_pos = 0;
                 }
-            }
         }
 
         public override ResourceScheme Scheme
