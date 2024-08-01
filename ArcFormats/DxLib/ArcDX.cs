@@ -271,7 +271,7 @@ namespace GameRes.Formats.DxLib
                 dx = ReadArcHeaderV6 (file, version, key);
             if (null == dx || dx.DirTable >= dx.IndexSize || dx.FileTable >= dx.IndexSize)
                 return null;
-            using (var encrypted = file.CreateStream (dx.IndexOffset, dx.IndexSize))
+            using (var encrypted = file.CreateStream (dx.IndexOffset, (uint)dx.IndexSize))
             using (var index = new EncryptedStream (encrypted, version >= 6 ? 0 : dx.IndexOffset, key))
             using (var reader = IndexReader.Create (dx, version, index))
             {
@@ -305,8 +305,8 @@ namespace GameRes.Formats.DxLib
                 IndexSize  = LittleEndian.ToUInt32 (header, 0),
                 BaseOffset = LittleEndian.ToInt64 (header, 4),
                 IndexOffset = LittleEndian.ToInt64 (header, 0x0C),
-                FileTable  = (uint)LittleEndian.ToInt64 (header, 0x14),
-                DirTable   = (uint)LittleEndian.ToInt64 (header, 0x1C),
+                FileTable  = LittleEndian.ToInt64 (header, 0x14),
+                DirTable   = LittleEndian.ToInt64 (header, 0x1C),
                 CodePage   = LittleEndian.ToInt32 (header, 0x24),
             };
         }

@@ -153,7 +153,8 @@ namespace GameRes.Formats.DxLib
             var readyStr = new MemoryStream(headerBuffer);
             ArcView arcView = new ArcView(readyStr, "hdr",(uint)headerBuffer.LongLength);
             List<Entry> entries;
-            using (var indexStr = arcView.CreateStream(0, dx.IndexSize))
+            //TODO: Try to memmap files with over 4GB.
+            using (var indexStr = arcView.CreateStream(0, (uint)dx.IndexSize))
             using (var reader = IndexReader.Create(dx, 8, indexStr))
             {
                  entries = reader.Read();
