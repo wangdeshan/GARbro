@@ -24,7 +24,6 @@
 //
 
 using GameRes.Formats.Strings;
-using NAudio.SoundFont;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
@@ -40,6 +39,17 @@ namespace GameRes.Formats.DxLib
 
     internal class DXA8PackedEntry : PackedEntry {
         public bool HuffmanCompressed { get; set; }
+    }
+
+    internal struct DXA8HuffmanNode
+    {
+        UInt64 Weight;
+        int bitNumber;
+        byte[] bitArray; //32 bytes here
+        int Index;
+
+        int ParentNode; // index of parent node.
+        int[] ChildNode; //two children nodes, -1 if not existent.
     }
 
         [Export(typeof(ArchiveFormat))]
@@ -153,7 +163,7 @@ namespace GameRes.Formats.DxLib
             var readyStr = new MemoryStream(headerBuffer);
             ArcView arcView = new ArcView(readyStr, "hdr",(uint)headerBuffer.LongLength);
             List<Entry> entries;
-            //TODO: Try to memmap files with over 4GB.
+            //There MAY be the case where the singular file is over 4GB, but it's very rare. 
             using (var indexStr = arcView.CreateStream(0, (uint)dx.IndexSize))
             using (var reader = IndexReader.Create(dx, 8, indexStr))
             {
