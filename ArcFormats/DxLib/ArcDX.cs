@@ -335,9 +335,9 @@ namespace GameRes.Formats.DxLib
     {
         public long BaseOffset;
         public long IndexOffset;
-        public uint IndexSize;
-        public uint FileTable;
-        public uint DirTable;
+        public long IndexSize;
+        public long FileTable;
+        public long DirTable;
         public int  CodePage;
     }
 

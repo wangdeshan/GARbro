@@ -23,7 +23,6 @@
 // IN THE SOFTWARE.
 //
 
-using GameRes.Formats.PkWare;
 using GameRes.Formats.Strings;
 using NAudio.SoundFont;
 using System;
@@ -31,12 +30,18 @@ using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.IO;
 using System.Linq;
+using System.Windows.Navigation;
 
 
 
 
 namespace GameRes.Formats.DxLib
 {
+
+    internal class DXA8PackedEntry : PackedEntry {
+        public bool HuffmanCompressed { get; set; }
+    }
+
         [Export(typeof(ArchiveFormat))]
     public class Dx8Opener : DxOpener
     {
@@ -60,10 +65,8 @@ namespace GameRes.Formats.DxLib
 
         internal class DxHeaderV8 :DxHeader
         {
-            new public long FileTable;
-            new public long DirTable;
             public DXA8Flags Flags;
-            public byte HuffmanKB;
+            public byte HuffmanKB; // oddly used only in Compression process not in decompression.
             //15 bytes of padding.
         }
 
@@ -150,7 +153,7 @@ namespace GameRes.Formats.DxLib
             var readyStr = new MemoryStream(headerBuffer);
             ArcView arcView = new ArcView(readyStr, "hdr",(uint)headerBuffer.LongLength);
             List<Entry> entries;
-            using (var indexStr = arcView.CreateStream(dx.IndexOffset, dx.IndexSize))
+            using (var indexStr = arcView.CreateStream(0, dx.IndexSize))
             using (var reader = IndexReader.Create(dx, 8, indexStr))
             {
                  entries = reader.Read();
@@ -213,10 +216,11 @@ namespace GameRes.Formats.DxLib
                     var size = m_input.ReadInt64();
                     var packed_size = m_input.ReadInt64();
                     var huffman_packed_size = m_input.ReadInt64();
-                    var entry = FormatCatalog.Instance.Create<PackedEntry>(Path.Combine(root, ExtractFileName(name_offset)));
+                    var entry = FormatCatalog.Instance.Create<DXA8PackedEntry>(Path.Combine(root, ExtractFileName(name_offset)));
                     entry.Offset = m_header.BaseOffset + offset;
                     entry.UnpackedSize = (uint)size;
-                    entry.IsPacked = (-1 != packed_size) || -1 != huffman_packed_size;
+                    entry.IsPacked = -1 != packed_size;
+                    entry.HuffmanCompressed = -1 != huffman_packed_size;
                     if (entry.IsPacked)
                         entry.Size = (uint)(huffman_packed_size!=-1 ? huffman_packed_size:packed_size);
                     else
