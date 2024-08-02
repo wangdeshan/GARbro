@@ -39,18 +39,10 @@ namespace GameRes.Formats.DxLib
 
     internal class DXA8PackedEntry : PackedEntry {
         public bool HuffmanCompressed { get; set; }
+        public uint HuffmanSize { get; set; }
     }
 
-    internal struct DXA8HuffmanNode
-    {
-        UInt64 Weight;
-        int bitNumber;
-        byte[] bitArray; //32 bytes here
-        int Index;
-
-        int ParentNode; // index of parent node.
-        int[] ChildNode; //two children nodes, -1 if not existent.
-    }
+    
 
         [Export(typeof(ArchiveFormat))]
     public class Dx8Opener : DxOpener
@@ -67,7 +59,7 @@ namespace GameRes.Formats.DxLib
             Signatures = new[] { 0x00085844u };
         }
 
-        static readonly byte[] DefaultKey = new byte[] { 0xBE, 0xC8, 0x8A, 0xF5, 0x28, 0x50, 0xC9 };
+        //static readonly byte[] DefaultKey = new byte[] { 0xBE, 0xC8, 0x8A, 0xF5, 0x28, 0x50, 0xC9 };
 
 
         DxScheme DefaultScheme = new DxScheme { KnownKeys = new List<IDxKey>() };
@@ -100,11 +92,8 @@ namespace GameRes.Formats.DxLib
             };
         }
 
-        string QueryPassword(ArcView file)
-        {
-            var options = Query<DXAOpts>(arcStrings.ZIPEncryptedNotice);
-            return options.Keyword;
-        }
+        
+        
 
         public override ResourceOptions GetOptions(object widget)
         {
@@ -191,11 +180,13 @@ namespace GameRes.Formats.DxLib
 
         DxDirectory ReadDirEntry()
         {
-            var dir = new DxDirectory();
-            dir.DirOffset = m_input.ReadInt64();
-            dir.ParentDirOffset = m_input.ReadInt64();
-            dir.FileCount = (int)m_input.ReadInt64();
-            dir.FileTable = m_input.ReadInt64();
+            var dir = new DxDirectory
+            {
+                DirOffset = m_input.ReadInt64(),
+                ParentDirOffset = m_input.ReadInt64(),
+                FileCount = (int)m_input.ReadInt64(),
+                FileTable = m_input.ReadInt64()
+            };
             return dir;
         }
 
@@ -232,6 +223,7 @@ namespace GameRes.Formats.DxLib
                     entry.UnpackedSize = (uint)size;
                     entry.IsPacked = -1 != packed_size;
                     entry.HuffmanCompressed = -1 != huffman_packed_size;
+                    entry.HuffmanSize = (uint)huffman_packed_size;
                     if (entry.IsPacked)
                         entry.Size = (uint)(huffman_packed_size!=-1 ? huffman_packed_size:packed_size);
                     else
