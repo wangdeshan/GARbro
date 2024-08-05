@@ -89,6 +89,10 @@ namespace GameRes.Formats.DxLib
             originalSize = compressedSize = headerSize = 0;
             ushort[] weights = new ushort[256];
             nodes = new DXA8HuffmanNode[256+255]; //256 data nodes, then 255 hierarchy nodes.
+            for (int i = 0; i < nodes.Length; i++)
+            {
+                nodes[i] = new DXA8HuffmanNode();
+            }
         }
 
         public byte[] Unpack ()
