@@ -59,11 +59,11 @@ namespace GameRes.Formats.DxLib
         byte[]          m_output;
 
         int             m_src;
-        ulong             m_bits;
+        byte             m_bits;
         int             m_bit_count;
 
         ulong m_readBytes;
-        ulong m_readBits;
+        byte m_readBits;
 
         
         DXA8HuffmanNode[] nodes; //256+255 nodes
@@ -106,9 +106,9 @@ namespace GameRes.Formats.DxLib
             }
             SetupWeights();
             //check if compressedSize and src size match.
-            if (srcSize!=compressedSize)
+            if (srcSize!=(compressedSize+headerSize))
             {
-                throw new FileSizeException(String.Format("Supplied srcSize does not match with compressedSize. Expected {0} got {1}",compressedSize,srcSize));
+                throw new FileSizeException(String.Format("Supplied srcSize does not match with compressedSize+headerSize. Expected {0} got {1}",compressedSize+headerSize,srcSize));
             }
             m_output = new byte[originalSize];
             CreateTree();
@@ -120,8 +120,8 @@ namespace GameRes.Formats.DxLib
         private void DoUnpack()
         {
             var targetSize = originalSize;
-            byte[] compressedData = new byte[compressedSize - headerSize];
-            Array.Copy(m_input, (long)headerSize, compressedData, 0, (long)(compressedSize - headerSize));
+            byte[] compressedData = new byte[compressedSize];
+            Array.Copy(m_input, (long)headerSize, compressedData, 0, (long)(compressedSize));
 
             int PressBitCounter=0, PressBitData=0, Index=0, NodeIndex=0;
             int PressSizeCounter = 0;
@@ -338,16 +338,15 @@ namespace GameRes.Formats.DxLib
         ulong GetBits (int count)
         {
             ulong bits = 0;
-            while (count --> 0)
+            for (int i = 0; i < count;i++)
             {
                 if (0 == m_bit_count)
                 {
-                    m_bits = BigEndian.ToUInt32 (m_input, m_src);
-                    m_src += 4;
-                    m_bit_count = 32;
+                    m_bits = m_input[m_src];
+                    m_src += 1;
+                    m_bit_count = 8;
                 }
-                bits = bits << 1 | (m_bits & 1);
-                m_bits >>= 1;
+                bits |= ((ulong)((m_bits >> (7 - m_readBits)) & 1)) <<(count-1-i);
                 --m_bit_count;
                 m_readBits++;
                 if (m_readBits ==8)
