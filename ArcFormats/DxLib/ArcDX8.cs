@@ -147,7 +147,7 @@ namespace GameRes.Formats.DxLib
                 byte[] huffmanBuffer = new byte[headerBuffer.Length]; 
                 byte[] lzBuffer;
                 headerBuffer.CopyTo(huffmanBuffer, 0);
-                huffmanBuffer = headerBuffer;
+                //huffmanBuffer = headerBuffer;
                 HuffmanDecoder decoder = new HuffmanDecoder(huffmanBuffer, (ulong)huffmanBuffer.LongLength);
                 lzBuffer = decoder.Unpack();
                 MemoryStream lzStream = new MemoryStream(lzBuffer);

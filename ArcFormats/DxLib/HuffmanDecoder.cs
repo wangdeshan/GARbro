@@ -35,7 +35,7 @@ using GameRes.Utility;
 
 namespace GameRes.Formats.DxLib
 {
-    internal struct DXA8HuffmanNode
+    internal class DXA8HuffmanNode
     {
         public UInt64 Weight;
         public int bitNumber;
@@ -44,6 +44,13 @@ namespace GameRes.Formats.DxLib
 
         public int ParentNode; // index of parent node.
         public int[] ChildNode; //two children nodes, -1 if not existent.
+
+        DXA8HuffmanNode()
+        {
+            bitArray = new byte[32];
+            ChildNode = new int[2];
+        }
+        
     }
 
     internal sealed class HuffmanDecoder
