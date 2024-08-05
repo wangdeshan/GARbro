@@ -45,7 +45,7 @@ namespace GameRes.Formats.DxLib
         public int ParentNode; // index of parent node.
         public int[] ChildNode; //two children nodes, -1 if not existent.
 
-        DXA8HuffmanNode()
+        internal DXA8HuffmanNode()
         {
             bitArray = new byte[32];
             ChildNode = new int[2];
@@ -338,9 +338,9 @@ namespace GameRes.Formats.DxLib
             {
                 if (0 == m_bit_count)
                 {
-                    m_bits = LittleEndian.ToUInt64 (m_input, m_src);
-                    m_src += 8;
-                    m_bit_count = 64;
+                    m_bits = BigEndian.ToUInt32 (m_input, m_src);
+                    m_src += 4;
+                    m_bit_count = 32;
                 }
                 bits = bits << 1 | (m_bits & 1);
                 m_bits >>= 1;
