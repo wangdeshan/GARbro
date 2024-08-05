@@ -343,9 +343,10 @@ namespace GameRes.Formats.DxLib
                 if (0 == m_bit_count)
                 {
                     m_bits = m_input[m_src];
-                    m_src += 1;
+                    m_src++;
                     m_bit_count = 8;
                 }
+                //bits are read backwards.
                 bits |= ((ulong)((m_bits >> (7 - m_readBits)) & 1)) <<(count-1-i);
                 --m_bit_count;
                 m_readBits++;
