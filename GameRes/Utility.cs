@@ -167,23 +167,14 @@ namespace GameRes.Utility
             return (short)(value[index] << 8 | value[index+1]);
         }
 
-        public static uint ToUInt32<TArray>(TArray value, int index) where TArray : IList<byte>
+        public static uint ToUInt32<TArray> (TArray value, int index) where TArray : IList<byte>
         {
-            return (uint)(value[index] << 24 | value[index + 1] << 16 | value[index + 2] << 8 | value[index + 3]);
+            return (uint)(value[index] << 24 | value[index+1] << 16 | value[index+2] << 8 | value[index+3]);
         }
 
-        public static int ToInt32<TArray>(TArray value, int index) where TArray : IList<byte>
+        public static int ToInt32<TArray> (TArray value, int index) where TArray : IList<byte>
         {
-            return (int)ToUInt32(value, index);
-        }
-        public static ulong ToUInt64<TArray>(TArray value, int index) where TArray : IList<byte>
-        {
-            return (ulong)(value[index]<<56|value[index+1]<<48|value[index+2]<<40|value[index+3]<<32|value[index+4] << 24 | value[index + 5] << 16 | value[index + 6] << 8 | value[index + 7]);
-        }
-
-        public static long ToInt64<TArray>(TArray value, int index) where TArray : IList<byte>
-        {
-            return (long)ToUInt64(value, index);
+            return (int)ToUInt32 (value, index);
         }
 
         public static void Pack (ushort value, byte[] buf, int index)
