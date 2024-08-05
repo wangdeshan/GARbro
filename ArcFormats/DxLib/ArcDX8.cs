@@ -144,8 +144,15 @@ namespace GameRes.Formats.DxLib
             //Decrypted but might be compressed
             if ((dx.Flags & DXA8Flags.DXA_FLAG_NO_HEAD_PRESS) == 0)
             {
-                //IndexSize refers to uncompressed size of the header (that is FileName + File + Dir buffers)
-                throw new NotImplementedException();
+                byte[] huffmanBuffer = new byte[headerBuffer.Length]; 
+                byte[] lzBuffer;
+                headerBuffer.CopyTo(huffmanBuffer, 0);
+                huffmanBuffer = headerBuffer;
+                HuffmanDecoder decoder = new HuffmanDecoder(huffmanBuffer, (ulong)huffmanBuffer.LongLength);
+                lzBuffer = decoder.Unpack();
+                MemoryStream lzStream = new MemoryStream(lzBuffer);
+                headerBuffer = Unpack(lzStream);
+                
             }
 
             

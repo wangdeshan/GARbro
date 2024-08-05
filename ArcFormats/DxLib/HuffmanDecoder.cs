@@ -24,8 +24,11 @@
 // IN THE SOFTWARE.
 //
 
+//Original file is Huffman.cpp. Creator: 山田 巧 Date: 2018 Dec 16
+
 
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
 using GameRes.Utility;
@@ -62,20 +65,23 @@ namespace GameRes.Formats.DxLib
         ulong compressedSize;
         ulong headerSize;
 
+        ulong srcSize;
+
         //ushort token = 256;
 
-        public HuffmanDecoder (byte[] src, byte[] dst)
+        public HuffmanDecoder (byte[] src,ulong srcSize)
         {
             m_input = src;
-            m_output = dst;
+            m_output = null;
 
+            this.srcSize = srcSize;
             m_src = 0;
             m_bit_count = 0;
             m_readBytes = 0;
             m_readBits = 0;
             originalSize = compressedSize = headerSize = 0;
             ushort[] weights = new ushort[256];
-            nodes = new DXA8HuffmanNode[256+255]; //256 "base" nodes, then 255 nodes making a pyramid.
+            nodes = new DXA8HuffmanNode[256+255]; //256 data nodes, then 255 hierarchy nodes.
         }
 
         public byte[] Unpack ()
@@ -88,8 +94,162 @@ namespace GameRes.Formats.DxLib
                 nodes[i].ChildNode[1] = -1;
             }
             SetupWeights();
+            //check if compressedSize and src size match.
+            if (srcSize!=compressedSize)
+            {
+                throw new FileSizeException(String.Format("Supplied srcSize does not match with compressedSize. Expected {0} got {1}",compressedSize,srcSize));
+            }
+            m_output = new byte[originalSize];
             CreateTree();
-            throw new NotImplementedException();
+            PopulateDataNodes();
+            DoUnpack();
+            return m_output;
+        }
+
+        private void DoUnpack()
+        {
+            var targetSize = originalSize;
+            byte[] compressedData = new byte[compressedSize - headerSize];
+            Array.Copy(m_input, (long)headerSize, compressedData, 0, (long)(compressedSize - headerSize));
+
+            int PressBitCounter=0, PressBitData=0, Index=0, NodeIndex=0;
+            int PressSizeCounter = 0;
+            ulong DestSizeCounter = 0;
+            int[] NodeIndexTable=new int[512];
+            {
+                ushort[] bitMask = new ushort[9];
+                for (int i = 0; i < 9; i++)
+                {
+                    bitMask[i] = (ushort)((1<<i+1) - 1);
+                }
+
+                for (int i = 0; i < 512; i++)
+                {
+                    NodeIndexTable[i] = -1;
+
+                    for (int j = 0; j < 256 + 254; j++)
+                    {
+                        ushort BitArrayFirstBatch;
+                        if (nodes[j].bitNumber > 9) continue;
+
+                        BitArrayFirstBatch = (ushort)(nodes[j].bitArray[0] | (nodes[j].bitNumber << 8));
+
+                        if ((i & bitMask[nodes[j].bitNumber - 1]) == (BitArrayFirstBatch & bitMask[nodes[j].bitNumber-1]))
+                        {
+                            NodeIndexTable[i] = j;
+                            break;
+                        }
+                    }
+
+                }
+
+            }
+            PressBitData = compressedData[PressBitCounter];
+
+            for (DestSizeCounter = 0;DestSizeCounter < originalSize; DestSizeCounter++)
+            {
+                if (DestSizeCounter>= originalSize - 17)
+                {
+                    NodeIndex = 510;
+                }
+                else
+                {
+                    if (PressBitCounter==8)
+                    {
+                        PressSizeCounter++;
+                        PressBitData = compressedData[PressSizeCounter];
+                        PressBitCounter = 0;
+                    }
+
+                    PressBitData = (PressBitData | (compressedData[PressSizeCounter+1]<<(8-PressBitCounter))) & 0x1ff;
+                    NodeIndex = NodeIndexTable[PressBitData];
+                    PressBitCounter += nodes[NodeIndex].bitNumber;
+                    if (PressBitCounter >= 16)
+                    {
+                        PressSizeCounter += 2;
+                        PressBitCounter -= 16;
+                        PressBitData = compressedData[PressSizeCounter] >> PressBitCounter;
+                    }
+                    else if (PressBitCounter >=8)
+                    {
+                        PressSizeCounter ++;
+                        PressBitCounter -= 8;
+                        PressBitData = compressedData[PressSizeCounter] >> PressBitCounter;
+                    }
+                    else
+                    {
+                        PressBitData >>= nodes[NodeIndex].bitNumber;
+                    }
+                    while (NodeIndex>255)
+                    {
+                        if (PressBitCounter==8)
+                        {
+                            PressSizeCounter++;
+                            PressBitData = compressedData[PressSizeCounter];
+                            PressBitCounter = 0;
+                        }
+                        Index = PressBitData & 1;
+                        PressBitData >>= 1;
+                        PressSizeCounter++;
+                        NodeIndex = nodes[NodeIndex].ChildNode[Index];
+                    }
+                }
+                m_output[DestSizeCounter] = (byte)NodeIndex;
+            }
+
+        }
+
+        private void PopulateDataNodes()
+        {
+            //The data which is populated is path from root to target node in bits.
+            byte[] ScratchSpace = new byte[32];
+            int TempBitIndex, TempBitCount;
+
+            for (int i = 0; i < 256 + 254; i++) //root node is excluded.
+            {
+                nodes[i].bitNumber = 0;
+                TempBitIndex = 0;
+                TempBitCount = 0;
+                ScratchSpace[TempBitIndex] = 0;
+
+                for (int j = i; nodes[j].ParentNode!=-1;j = nodes[j].ParentNode)
+                {
+                    if (TempBitCount == 8)
+                    {
+                        TempBitCount = 0;
+                        TempBitIndex++;
+                        ScratchSpace[TempBitIndex] = 0;
+                    }
+                    ScratchSpace[TempBitIndex] <<= 1;
+                    ScratchSpace[TempBitIndex] |= (byte)nodes[j].Index;
+                    TempBitCount++;
+                    nodes[i].bitNumber++;
+
+                }
+                //path is now backwards (target to root). Pupulate BitPath from root to target.
+                int BitIndex=0, BitCount=0;
+                nodes[i].bitArray[BitIndex] = 0;
+                while (TempBitIndex >= 0)
+                {
+                    if (BitCount == 8)
+                    {
+                        BitCount = 0;
+                        BitIndex++;
+                        nodes[i].bitArray[BitIndex] = 0;
+                    }
+                    nodes[i].bitArray[BitIndex] |= (byte)((ScratchSpace[TempBitIndex] & 1) << BitCount);
+                    ScratchSpace[TempBitIndex] >>= 1;
+                    TempBitCount--;
+                    if (TempBitCount == 0)
+                    {
+                        TempBitIndex--;
+                        TempBitCount = 8;
+                    }
+                    BitCount++;
+                }
+            }
+
+
         }
 
         private void SetupWeights()
@@ -115,6 +275,7 @@ namespace GameRes.Formats.DxLib
                 SaveData = (ushort)GetBits(BitNum);
                 weights[i] = (ushort)(Minus == 1 ? weights[i - 1] - SaveData : weights[i - 1] + SaveData);
             }
+            headerSize = GetReadBytes();
             for (int i = 0;i < 256; i++)
             {
                 nodes[i].Weight = weights[i];
