@@ -201,7 +201,7 @@ namespace GameRes.Formats.DxLib
                         }
                         Index = PressBitData & 1;
                         PressBitData >>= 1;
-                        PressSizeCounter++;
+                        PressBitCounter++;
                         NodeIndex = nodes[NodeIndex].ChildNode[Index];
                     }
                 }
@@ -237,7 +237,7 @@ namespace GameRes.Formats.DxLib
                     nodes[i].bitNumber++;
 
                 }
-                //path is now backwards (target to root). Pupulate BitPath from root to target.
+                //path is now backwards (target to root). Populate BitPath from root to target.
                 int BitIndex=0, BitCount=0;
                 nodes[i].bitArray[BitIndex] = 0;
                 while (TempBitIndex >= 0)
@@ -278,7 +278,7 @@ namespace GameRes.Formats.DxLib
             BitNum = (byte)(((int)GetBits(3) + 1) * 2);
             Minus = (byte)GetBits(1);
             SaveData = (ushort)GetBits(BitNum);
-            nodes[0].Weight = SaveData;
+            weights[0] = SaveData;
             for (int i = 1; i < 256; i++)
             {
                 BitNum = (byte)(((int)GetBits(3) + 1) * 2);
