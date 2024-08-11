@@ -25,11 +25,14 @@
 
 using GameRes.Formats.Strings;
 using System;
+using System.CodeDom;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.IO;
 using System.Linq;
+using System.Runtime.Remoting.Messaging;
 using System.Windows.Navigation;
+using static GameRes.Formats.DxLib.Dx8Opener;
 
 
 
@@ -40,11 +43,28 @@ namespace GameRes.Formats.DxLib
     internal class DXA8PackedEntry : PackedEntry {
         public bool HuffmanCompressed { get; set; }
         public uint HuffmanSize { get; set; }
+
+        public uint LZSize { get; set; }
     }
 
-    
+    internal class DxArchive8 : DxArchive
+    {
+        public byte huffmanMaxKB;
 
-        [Export(typeof(ArchiveFormat))]
+        public DxArchive8(ArcView arc, ArchiveFormat impl, ICollection<Entry> dir, IDxKey enc, int version,byte huffmanKB) : base(arc, impl, dir, enc, version)
+        {
+            huffmanMaxKB = huffmanKB;
+        }
+    }
+
+    internal class DxHeaderV8 : DxHeader
+    {
+        public DXA8Flags Flags;
+        public byte HuffmanKB; // oddly used only in Compression process not in decompression.
+                               //15 bytes of padding.
+    }
+
+    [Export(typeof(ArchiveFormat))]
     public class Dx8Opener : DxOpener
     {
         public override string         Tag { get { return "BIN/DXLIB"; } }
@@ -65,12 +85,7 @@ namespace GameRes.Formats.DxLib
         DxScheme DefaultScheme = new DxScheme { KnownKeys = new List<IDxKey>() };
 
 
-        internal class DxHeaderV8 :DxHeader
-        {
-            public DXA8Flags Flags;
-            public byte HuffmanKB; // oddly used only in Compression process not in decompression.
-            //15 bytes of padding.
-        }
+        
 
         internal enum DXA8Flags : UInt32
         {
@@ -156,16 +171,74 @@ namespace GameRes.Formats.DxLib
             }
 
             
-            var readyStr = new MemoryStream(headerBuffer);
-            ArcView arcView = new ArcView(readyStr, "hdr",(uint)headerBuffer.LongLength);
             List<Entry> entries;
-            //There MAY be the case where the singular file is over 4GB, but it's very rare. 
-            using (var indexStr = arcView.CreateStream(0, (uint)dx.IndexSize))
-            using (var reader = IndexReader.Create(dx, 8, indexStr))
+            //There MAY be the case where the singular file is over 4GB, but it's very rare.
+            using (var reader = IndexReader.Create(dx, 8, new MemoryStream(headerBuffer)))
             {
-                 entries = reader.Read();
+                entries = reader.Read();
             }
-            return new DxArchive(arcView, this,entries ,key, 8);
+            return new DxArchive8(file, this,entries ,key, 8,dx.HuffmanKB);
+            //return null;
+        }
+
+        public override Stream OpenEntry(ArcFile arc, Entry entry)
+        {
+            Stream input = arc.File.CreateStream(entry.Offset, entry.Size);
+            var dx_arc = arc as DxArchive8;
+            if (null == dx_arc)
+                return input;
+            var dx_ent = (DXA8PackedEntry)entry;
+            long dec_offset =  dx_ent.UnpackedSize; //is this still right?
+            var key = dx_arc.Encryption.GetEntryKey(dx_ent.Name);
+            input = new EncryptedStream(input, dec_offset, key);
+            if (!dx_ent.HuffmanCompressed && !dx_ent.IsPacked)
+                return input;
+            //we ruled out the case in which neither compression is applied. We still have 3 cases to go.
+
+            byte[] tmpBuffer = new byte[dx_ent.Size]; 
+            input.Read(tmpBuffer, 0, tmpBuffer.Length);
+            if (dx_ent.HuffmanCompressed)
+            {
+                byte[] buffer = new byte[dx_ent.HuffmanSize];
+                byte[] outBuffer = new byte[dx_ent.IsPacked ? dx_ent.LZSize : dx_ent.UnpackedSize];
+                Array.Copy(tmpBuffer, buffer, dx_ent.HuffmanSize);
+                HuffmanDecoder decoder = new HuffmanDecoder(buffer,dx_ent.HuffmanSize);
+                byte[] partTmpBuffer = decoder.Unpack();
+                //returned buffer might be partial. Check if this is the case.
+                var outBufSize = dx_ent.IsPacked ? dx_ent.LZSize : dx_ent.UnpackedSize;
+                if(dx_arc.huffmanMaxKB != 0xff && outBufSize > dx_arc.huffmanMaxKB * 1024 * 2)
+                {
+                    //What we have here is two huffmanMaxKB KB buffers, that constitute the beginning and end of file respectively.
+                    Array.Copy(partTmpBuffer,0, outBuffer, 0,dx_arc.huffmanMaxKB*1024);
+                    Array.Copy(partTmpBuffer,dx_arc.huffmanMaxKB*1024,outBuffer,outBuffer.Length-dx_arc.huffmanMaxKB*1024,dx_arc.huffmanMaxKB*1024);
+                    //uncompressed part goes into middle.
+                    input.Read(outBuffer, dx_arc.huffmanMaxKB * 1024, outBuffer.Length-dx_arc.huffmanMaxKB*1024*2);
+                    tmpBuffer = outBuffer;
+                } else
+                {
+                    //that is all that needs to be done.
+                    tmpBuffer = partTmpBuffer;
+                }
+            }
+            if(dx_ent.IsPacked)
+            {
+                byte[] buffer = new byte[dx_ent.LZSize];
+                tmpBuffer.CopyTo(buffer, 0);
+                var tmpMemStream = new MemoryStream(buffer);
+                tmpBuffer = Unpack(tmpMemStream);
+
+            }
+            return new BinMemoryStream(tmpBuffer, entry.Name);
+
+            /*
+            if (!dx_ent.IsPacked)
+                return input;
+            using (input)
+            {
+                var data = Unpack(input);
+                return new BinMemoryStream(data, entry.Name);
+            }
+            */
             //return null;
         }
     }
@@ -231,7 +304,19 @@ namespace GameRes.Formats.DxLib
                     entry.IsPacked = -1 != packed_size;
                     entry.HuffmanCompressed = -1 != huffman_packed_size;
                     entry.HuffmanSize = (uint)huffman_packed_size;
-                    if (entry.IsPacked)
+                    entry.LZSize = (uint)packed_size;
+                    //Huffman compression: huffman_packed_size will not exceed 2*HuffmanKB KB. The rest of data is uncompressed (as far as Huffman compressor is concerned).
+                    //Add length of uncompressed data to entry.Size
+                    if (entry.HuffmanCompressed)
+                    {
+                        var outBufSize = entry.IsPacked ? packed_size : size;
+                        var dx8_hdr = (DxHeaderV8)m_header;
+                        if (outBufSize > dx8_hdr.HuffmanKB * 1024 * 2)
+                        {
+                            huffman_packed_size += outBufSize - dx8_hdr.HuffmanKB * 1024 * 2;
+                        }
+                    }
+                    if (entry.IsPacked||entry.HuffmanCompressed)
                         entry.Size = (uint)(huffman_packed_size!=-1 ? huffman_packed_size:packed_size);
                     else
                         entry.Size = (uint)size;
