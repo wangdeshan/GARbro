@@ -143,7 +143,7 @@ namespace GameRes.Formats.DxLib
                         ushort BitArrayFirstBatch;
                         if (nodes[j].bitNumber > 9) continue;
 
-                        BitArrayFirstBatch = (ushort)(nodes[j].bitArray[0] | (nodes[j].bitNumber << 8));
+                        BitArrayFirstBatch = (ushort)(nodes[j].bitArray[0] | (nodes[j].bitArray[1] << 8));
 
                         if ((i & bitMask[nodes[j].bitNumber - 1]) == (BitArrayFirstBatch & bitMask[nodes[j].bitNumber-1]))
                         {
@@ -191,19 +191,20 @@ namespace GameRes.Formats.DxLib
                     {
                         PressBitData >>= nodes[NodeIndex].bitNumber;
                     }
-                    while (NodeIndex>255)
+                }
+
+                while (NodeIndex > 255)
+                {
+                    if (PressBitCounter == 8)
                     {
-                        if (PressBitCounter==8)
-                        {
-                            PressSizeCounter++;
-                            PressBitData = compressedData[PressSizeCounter];
-                            PressBitCounter = 0;
-                        }
-                        Index = PressBitData & 1;
-                        PressBitData >>= 1;
-                        PressBitCounter++;
-                        NodeIndex = nodes[NodeIndex].ChildNode[Index];
+                        PressSizeCounter++;
+                        PressBitData = compressedData[PressSizeCounter];
+                        PressBitCounter = 0;
                     }
+                    Index = PressBitData & 1;
+                    PressBitData >>= 1;
+                    PressBitCounter++;
+                    NodeIndex = nodes[NodeIndex].ChildNode[Index];
                 }
                 m_output[DestSizeCounter] = (byte)NodeIndex;
             }
