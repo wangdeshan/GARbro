@@ -32,6 +32,7 @@ using System.ComponentModel.Composition;
 using GameRes.Compression;
 using GameRes.Formats.Strings;
 using GameRes.Utility;
+using ZstdNet;
 
 namespace GameRes.Formats.NeXAS
 {
@@ -42,6 +43,7 @@ namespace GameRes.Formats.NeXAS
         Huffman,
         Deflate,
         DeflateOrNone,
+        ZstdOrNone = 7,
     }
 
     public class PacArchive : ArcFile
@@ -172,25 +174,39 @@ namespace GameRes.Formats.NeXAS
             var input = arc.File.CreateStream (entry.Offset, entry.Size);
             var pac = arc as PacArchive;
             var pent = entry as PackedEntry;
-            if (null == pac || null == pent || !pent.IsPacked)
+            if (null == pac || null == pent || entry.Size == pent.UnpackedSize || !pent.IsPacked)
                 return input;
-            switch (pac.PackType)
-            {
-            case Compression.Lzss:
-                return new LzssStream (input);
+			
+			try {
+				switch (pac.PackType)
+				{
+				case Compression.Lzss:
+					return new LzssStream (input);
 
-            case Compression.Huffman:
-                using (input)
-                {
-                    var packed = new byte[entry.Size];
-                    input.Read (packed, 0, packed.Length);
-                    var unpacked = HuffmanDecode (packed, (int)pent.UnpackedSize);
-                    return new BinMemoryStream (unpacked, 0, (int)pent.UnpackedSize, entry.Name);
-                }
-            case Compression.Deflate:
-            default:
-                return new ZLibStream (input, CompressionMode.Decompress);
-            }
+				case Compression.Huffman:
+					using (input)
+					{
+						var packed = new byte[entry.Size];
+						input.Read (packed, 0, packed.Length);
+						var unpacked = HuffmanDecode (packed, (int)pent.UnpackedSize);
+						return new BinMemoryStream (unpacked, 0, (int)pent.UnpackedSize, entry.Name);
+					}
+				case Compression.Deflate:
+					return new ZLibStream (input, CompressionMode.Decompress);
+				case Compression.ZstdOrNone:
+					using (ZstdNet.Decompressor dec = new ZstdNet.Decompressor())
+					{
+						byte[] array2 = new byte[entry.Size];
+						input.Read(array2, 0, array2.Length);
+						byte[] input2 = dec.Unwrap(array2, (int)pent.UnpackedSize);
+						return new BinMemoryStream(input2, 0, (int)pent.UnpackedSize, entry.Name);
+					}
+				default: 
+					return input;
+				}
+			}catch (Exception er){
+				return input;
+			}
         }
 
         static private byte[] HuffmanDecode (byte[] packed, int unpacked_size)
