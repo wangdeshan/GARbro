@@ -178,7 +178,7 @@ namespace GameRes.Formats.DxLib
                 entries = reader.Read();
             }
             return new DxArchive8(file, this,entries ,key, 8,dx.HuffmanKB);
-            //return null;
+            //retu rn null;
         }
 
         public override Stream OpenEntry(ArcFile arc, Entry entry)
@@ -188,7 +188,7 @@ namespace GameRes.Formats.DxLib
             if (null == dx_arc)
                 return input;
             var dx_ent = (DXA8PackedEntry)entry;
-            long dec_offset =  dx_ent.UnpackedSize; //is this still right?
+            long dec_offset =  dx_ent.UnpackedSize; 
             var key = dx_arc.Encryption.GetEntryKey(dx_ent.Name);
             input = new EncryptedStream(input, dec_offset, key);
             if (!dx_ent.HuffmanCompressed && !dx_ent.IsPacked)
@@ -212,7 +212,7 @@ namespace GameRes.Formats.DxLib
                     Array.Copy(partTmpBuffer,0, outBuffer, 0,dx_arc.huffmanMaxKB*1024);
                     Array.Copy(partTmpBuffer,dx_arc.huffmanMaxKB*1024,outBuffer,outBuffer.Length-dx_arc.huffmanMaxKB*1024,dx_arc.huffmanMaxKB*1024);
                     //uncompressed part goes into middle.
-                    input.Read(outBuffer, dx_arc.huffmanMaxKB * 1024, outBuffer.Length-dx_arc.huffmanMaxKB*1024*2);
+                    Array.Copy(tmpBuffer, dx_ent.HuffmanSize, outBuffer, dx_arc.huffmanMaxKB * 1024, outBufSize - dx_arc.huffmanMaxKB * 1024 * 2);
                     tmpBuffer = outBuffer;
                 } else
                 {
