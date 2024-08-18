@@ -150,7 +150,7 @@ namespace GameRes.Formats.DxLib
             if (isencrypted)
             {
                 var keyStr = Query<DXAOpts>(arcStrings.ZIPEncryptedNotice).Keyword;
-                key = new DxKey8(keyStr);
+                key = new DxKey8(keyStr,dx.CodePage);
 
                 
             }
@@ -191,9 +191,6 @@ namespace GameRes.Formats.DxLib
             long dec_offset =  dx_ent.UnpackedSize; 
             var key = dx_arc.Encryption.GetEntryKey(dx_ent.Name);
             input = new EncryptedStream(input, dec_offset, key);
-            if (!dx_ent.HuffmanCompressed && !dx_ent.IsPacked)
-                return input;
-            //we ruled out the case in which neither compression is applied. We still have 3 cases to go.
 
             byte[] tmpBuffer = new byte[dx_ent.Size]; 
             input.Read(tmpBuffer, 0, tmpBuffer.Length);

@@ -159,8 +159,10 @@ namespace GameRes.Formats.DxLib
     [Serializable]
     public class DxKey8 : DxKey
     {
-        public DxKey8(string password) : base(password ?? "DXARC")
+        private int codepage;
+        public DxKey8(string password,int codepage) : base(password ?? "DXARC")
         {
+            this.codepage = codepage;
         }
 
         public override byte[] GetEntryKey(string name)
@@ -179,13 +181,26 @@ namespace GameRes.Formats.DxLib
             {
                 keyword += "DXARC";
             }
-            string oddString, evenString;
-            byte[] key = new byte[7];
-            oddString = string.Concat(keyword.Where((c, i) => i % 2 == 0));
-            evenString = string.Concat(keyword.Where((c, i) => (i+1) % 2 == 0));
+            //first split string to bytes. Use original encoding as basis. Otherwise we would fail to decrypt that.
+            Encoding defEncoding = Encoding.UTF8;
+            Encoding tgtEncoding = Encoding.GetEncoding(codepage);
+            byte[] defBytes = defEncoding.GetBytes(keyword);
+            byte[] tgtBytes = Encoding.Convert(defEncoding, tgtEncoding, defBytes);
+            byte[] oddBuffer = new byte[tgtBytes.Length]; int oddCounter = 0;
+            byte[] evenBuffer = new byte[tgtBytes.Length]; int evenCounter = 0;
+            for (int i=0; i<tgtBytes.Length;i+=2,oddCounter++)
+            {
+                oddBuffer[oddCounter] = tgtBytes[i];
+            }
+            for (int i = 1; i < tgtBytes.Length; i += 2, evenCounter++)
+            {
+                evenBuffer[evenCounter] = tgtBytes[i];
+            }
             UInt32 crc_0, crc_1;
-            crc_0 = Crc32.Compute(Encoding.ASCII.GetBytes(oddString), 0, oddString.Length);
-            crc_1 = Crc32.Compute(Encoding.ASCII.GetBytes(evenString), 0, evenString.Length);
+            crc_0 = Crc32.Compute(oddBuffer, 0, oddCounter);
+            crc_1 = Crc32.Compute(evenBuffer, 0, evenCounter);
+
+            byte[] key = new byte[7];
             byte[] crc_0_Bytes = BitConverter.GetBytes(crc_0),crc_1_Bytes=BitConverter.GetBytes(crc_1);
             key[0] = crc_0_Bytes[0];
             key[1] = crc_0_Bytes[1];
@@ -195,6 +210,14 @@ namespace GameRes.Formats.DxLib
             key[5] = crc_1_Bytes[1];
             key[6] = crc_1_Bytes[2];
             return key;
+
+            /*
+            string oddString, evenString;
+            oddString = string.Concat(keyword.Where((c, i) => i % 2 == 0));
+            evenString = string.Concat(keyword.Where((c, i) => (i+1) % 2 == 0));
+            UInt32 crc_0, crc_1;
+            crc_0 = Crc32.Compute(Encoding.ASCII.GetBytes(oddString), 0, oddString.Length);
+            crc_1 = Crc32.Compute(Encoding.ASCII.GetBytes(evenString), 0, evenString.Length); */
             /*
             using (var sha = SHA256.Create())
             {
