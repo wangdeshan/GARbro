@@ -182,12 +182,10 @@ namespace GameRes.Formats.DxLib
                 keyword += "DXARC";
             }
             //first split string to bytes. Use original encoding as basis. Otherwise we would fail to decrypt that.
-            Encoding defEncoding = Encoding.UTF8;
             Encoding tgtEncoding = Encoding.GetEncoding(codepage);
-            byte[] defBytes = defEncoding.GetBytes(keyword);
-            byte[] tgtBytes = Encoding.Convert(defEncoding, tgtEncoding, defBytes);
-            byte[] oddBuffer = new byte[tgtBytes.Length]; int oddCounter = 0;
-            byte[] evenBuffer = new byte[tgtBytes.Length]; int evenCounter = 0;
+            byte[] tgtBytes = tgtEncoding.GetBytes(keyword);
+            byte[] oddBuffer = new byte[(tgtBytes.Length/2)+(tgtBytes.Length%2)]; int oddCounter = 0;
+            byte[] evenBuffer = new byte[(tgtBytes.Length/2)]; int evenCounter = 0;
             for (int i=0; i<tgtBytes.Length;i+=2,oddCounter++)
             {
                 oddBuffer[oddCounter] = tgtBytes[i];
