@@ -18,50 +18,52 @@ namespace GameRes.Formats.Kid
         public override ImageMetaData ReadMetaData(IBinaryStream file)
         {
             uint header = file.ReadUInt32();
-            if (header == 9)
-            {
-                return null;//throw new NotSupportedException(string.Format("BIP Chara format not supported."));
-            }
-            else if (header != 5)
+            uint real_sign;
+            bool multi = false; // not implemented
+            if (header < 5)
             {
                 return null;
             }
+            else if (header == 5)
+            {
+                real_sign = 0x14;
+            }
+            else if (header >= 6 && header <= 0x0C)
+            {
+                real_sign = header * 4;
+                multi = true;
+            }
+            else
+            {
+                return null; // throw new NotSupportedException(string.Format("BIP Chara format not supported."));
+            }
 
-            file.Seek(0x14, SeekOrigin.Begin);
-            if ((file.ReadUInt16() & 0x7FFF) != 256)
+            file.Seek(0x10, SeekOrigin.Begin);
+            uint fstart = file.ReadUInt16(); // usually 0x100
+
+            // Non-Sequential read
+            file.Seek(0x88, SeekOrigin.Begin); // next one +20
+            uint width = file.ReadUInt16();
+            uint height = file.ReadUInt16();
+            if (width > 2560 || height > 1440 || width < 16 || height < 16) // suppose not so large or so small
+                return null;
+
+            file.Seek(real_sign, SeekOrigin.Begin); // usually 0x14
+            if ((file.ReadUInt16() & 0x7FFF) != fstart)
             {
                 return null;
             }
             uint sign = file.ReadUInt16();
             uint dy;
             bool sliced = true;
-            if (sign == 0x17 || sign == 0x19 || sign == 0x1F || sign == 0x25 || sign == 0x2E || sign == 0x34)
+            long denominator = file.Length;
+            if (multi)
             {
-                //sign = focusT / 2
-                dy = 16;
+                file.Seek(0xA2, SeekOrigin.Begin);
+                uint f2start = file.ReadUInt16();
+                denominator = f2start * 1024 + fstart + 0x100;
             }
-            else if (sign == 0x13)
-            {
-                //sign = focusT / 2
-                dy = 16;
-                sliced = false;
-            }
-            else if (sign == 0x16 || sign == 0x20 || sign == 0x2A)
-            {
-                //sign = focusT * 2
-                dy = 32;
-            }
-            else
-            {
-                return null;
-            }
-
-            //uint dx = dy * 32;
-            file.Seek(0x88, SeekOrigin.Begin);
-            uint width = file.ReadUInt16();
-            uint height = file.ReadUInt16();
-            if (width > 2560 || height > 1440 || width < 16 || height < 16) // suppose not so large
-                return null;
+            double oversize = (double)width * height * 4 / denominator;
 
             file.Seek(0x90, SeekOrigin.Begin);
             //uint size = file.ReadUInt32(); // not size
@@ -73,12 +75,43 @@ namespace GameRes.Formats.Kid
             {
                 return null;
             }
+            uint pixelsize = (sizesign_high & 0x00FF) * 0x10000; /*r16: 2*pixelsize r32: pixelsize*/
+
+            if (oversize > 0.87 /*sign == 0x13*/)
+            {
+                // no-sliced oversize min: 0.87178 max: 0.9866
+                // sliced oversize max: 0.8333 min: 0.76
+                dy = 16;
+                sliced = false;
+                // sign = focusT / 2
+            }
+            else if (sign > 0x50)
+            {
+                return null;
+            }
+            else if (((double)pixelsize / denominator) <= 1.1 /*known oversize 1.02 for <=1, suppose fail > 1.8*/)
+            {
+                //sign % 2 == 0 && sign <= 0x2A && sign != 0x22 && sign != 0x1A
+                //sign == 0x16 || sign == 0x20 || sign == 0x2A
+                dy = 32;
+                // sign = focusT * 2
+            }
+            else
+            {
+                //sign == 0x17 || sign == 0x19 || sign == 0x1F || sign == 0x25 || sign == 0x2E || sign == 0x34
+                dy = 16;
+                // sign = focusT / 2
+            }
+
+            // uint dx = dy * 32;
+
             return new BipImageMetaData
             {
                 Width = width,
                 Height = height,
                 BlockSize = dy,
                 Sliced = sliced,
+                Multi = multi,
             };
         }
         public override ImageData Read(IBinaryStream file, ImageMetaData info)
@@ -86,7 +119,9 @@ namespace GameRes.Formats.Kid
             if (info == null)
                 throw new NotSupportedException(string.Format("Not BIP texture format."));
             var bipheader = (BipImageMetaData)info;
-            file.Seek(0x100, SeekOrigin.Begin);
+            file.Seek(0x10, SeekOrigin.Begin);
+            uint fstart = file.ReadUInt16(); // usually 0x100
+            file.Seek(fstart, SeekOrigin.Begin);
             byte[] pixels = new byte[bipheader.iWidth * bipheader.iHeight * 4];
             uint dy = bipheader.BlockSize;
             uint dx = dy * 32;
@@ -165,6 +200,7 @@ namespace GameRes.Formats.Kid
         {
             public uint BlockSize { get; set; }
             public bool Sliced { get; set; }
+            public bool Multi { get; set; }
         }
     }
 }
