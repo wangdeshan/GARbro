@@ -89,8 +89,9 @@ namespace GameRes.Formats.Kid
             {
                 return null;
             }
-            else if (((double)pixelsize / denominator) <= 1.1 /*known oversize 1.02 for <=1, suppose fail > 1.8*/)
+            else if (((double)pixelsize / denominator) <= 1.045 && sign != 0x2E && sign != 0x33)
             {
+                /*known oversize 1.02 for expected <=1, noticed smallest r16 oversize 1.045+ for MOAR2 EV_SP04A, 0.99+ for MOAR1 OM2_TT13A, 0.89+ for MOAR3 C3_30A*/
                 //sign % 2 == 0 && sign <= 0x2A && sign != 0x22 && sign != 0x1A
                 //sign == 0x16 || sign == 0x20 || sign == 0x2A
                 dy = 32;
