@@ -30,6 +30,7 @@ using System.IO;
 using GameRes.Compression;
 using System.Text;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace GameRes.Formats.Eushully
 {
@@ -64,12 +65,21 @@ namespace GameRes.Formats.Eushully
             return null;
         }
 
+        static internal string GetAAIName(string alf_name)
+        {
+            const string pattern = @"^(APPEND(?:[0-9]+)?)(?:_[0-9]+)?\.ALF$";
+            var match = Regex.Match(alf_name, pattern);
+            if (match.Success)
+                return match.Groups[1].Value;
+            return alf_name;
+        }
+
         internal IEnumerable<string> GetIndexNames (string alf_name)
         {
             yield return "sys5ini.bin";
             yield return "sys4ini.bin";
             yield return "sys3ini.bin";
-            yield return Path.ChangeExtension (alf_name, "AAI");
+            yield return Path.ChangeExtension (GetAAIName(alf_name), "AAI");
         }
 
         Tuple<string, Dictionary<string, List<Entry>>> LastAccessedIndex;
