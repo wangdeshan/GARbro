@@ -95,6 +95,7 @@ namespace GameRes.Formats.Eushully
         {
             new AGEArchiveInfo(Encoding.ASCII.GetBytes("S3IN"), 0x12C, false, false),
             new AGEArchiveInfo(Encoding.ASCII.GetBytes("S3IC"), 0x134, false, true),
+            new AGEArchiveInfo(Encoding.ASCII.GetBytes("S3AC"), 0x114, false, true),
             new AGEArchiveInfo(Encoding.ASCII.GetBytes("S4IC"), 0x134, false, true),
             new AGEArchiveInfo(Encoding.ASCII.GetBytes("S4AC"), 0x114, false, true),
             new AGEArchiveInfo(Encoding.Unicode.GetBytes("S5IC"), 0x224, true, true),
