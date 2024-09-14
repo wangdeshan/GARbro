@@ -32,7 +32,6 @@ using System.ComponentModel.Composition;
 using GameRes.Compression;
 using GameRes.Formats.Strings;
 using GameRes.Utility;
-using ZstdNet;
 
 namespace GameRes.Formats.NeXAS
 {
@@ -43,7 +42,6 @@ namespace GameRes.Formats.NeXAS
         Huffman,
         Deflate,
         DeflateOrNone,
-
         None2,
         Zstd,
         ZstdOrNone,
@@ -75,13 +73,13 @@ namespace GameRes.Formats.NeXAS
             Settings = new[] { PacEncoding };
         }
 
-        EncodingSetting PacEncoding = new EncodingSetting("NexasEncodingCP", "DefaultEncoding");
+        EncodingSetting PacEncoding = new EncodingSetting ("NexasEncodingCP", "DefaultEncoding");
 
         public override ArcFile TryOpen (ArcView file)
         {
             if (!file.View.AsciiEqual (0, "PAC") || 'K' == file.View.ReadByte (3))
                 return null;
-            var reader = new IndexReader(file, PacEncoding.Get<Encoding>());
+            var reader = new IndexReader (file, PacEncoding.Get<Encoding>());
             var dir = reader.Read();
             if (null == dir)
                 return null;
@@ -161,7 +159,7 @@ namespace GameRes.Formats.NeXAS
                 m_dir.Clear();
                 for (int i = 0; i < m_count; ++i)
                 {
-                    var name = index.ReadCString(name_length, m_encoding);
+                    var name = index.ReadCString (name_length, m_encoding);
                     if (string.IsNullOrWhiteSpace (name))
                         return false;
                     var entry = FormatCatalog.Instance.Create<PackedEntry> (name);
@@ -170,7 +168,6 @@ namespace GameRes.Formats.NeXAS
                     entry.Size          = index.ReadUInt32();
                     if (!entry.CheckPlacement (m_file.MaxOffset))
                         return false;
-
                     bool isPacked = false;
                     switch (m_pack_type)
                     {
@@ -219,17 +216,15 @@ namespace GameRes.Formats.NeXAS
                 }
             case Compression.Deflate:
             case Compression.DeflateOrNone:
-                {
-                    return new ZLibStream(input, CompressionMode.Decompress);
-                }
+                return new ZLibStream (input, CompressionMode.Decompress);
             case Compression.Zstd:
             case Compression.ZstdOrNone:
-                {
-                    byte[] unpacked = ZstdDecompress(input, pent.UnpackedSize);
-                    return new BinMemoryStream(unpacked, entry.Name);
-                }
+            {
+                var unpacked = ZstdDecompress (input, pent.UnpackedSize);
+                return new BinMemoryStream (unpacked, entry.Name);
+            }
             default:
-                    throw new NotImplementedException();
+                return input;
             }
         }
 
@@ -240,13 +235,13 @@ namespace GameRes.Formats.NeXAS
             return decoder.Unpack();
         }
 
-        static private byte[] ZstdDecompress(Stream s, uint unpackedSize)
+        static private byte[] ZstdDecompress (Stream s, uint unpackedSize)
         {
-            using(DecompressionStream zstdDecStream = new DecompressionStream(s))
+            using (var ds = new ZstdNet.DecompressionStream (s))
             {
-                byte[] dest = new byte[unpackedSize];
-                zstdDecStream.Read(dest, 0, dest.Length);
-                return dest;
+                var dst = new byte[unpackedSize];
+                ds.Read (dst, 0, dst.Length);
+                return dst;
             }
         }
     }
