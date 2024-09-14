@@ -825,5 +825,17 @@ namespace GameRes.Formats.Properties {
                 this["DXAPassword"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("932")]
+        public int NexasEncodingCP {
+            get {
+                return ((int)(this["NexasEncodingCP"]));
+            }
+            set {
+                this["NexasEncodingCP"] = value;
+            }
+        }
     }
 }
