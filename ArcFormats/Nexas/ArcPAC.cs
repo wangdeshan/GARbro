@@ -168,7 +168,6 @@ namespace GameRes.Formats.NeXAS
                     entry.Size          = index.ReadUInt32();
                     if (!entry.CheckPlacement (m_file.MaxOffset))
                         return false;
-                    bool isPacked = false;
                     switch (m_pack_type)
                     {
                         case 1:
@@ -176,18 +175,16 @@ namespace GameRes.Formats.NeXAS
                         case 3:
                         case 6:
                         {
-                            isPacked = true;
+                            entry.IsPacked = true;
                             break;
                         }
                         case 4:
                         case 7:
                         {
-                            isPacked = entry.Size != entry.UnpackedSize;
+                            entry.IsPacked = entry.Size != entry.UnpackedSize;
                             break;
                         }
                     }
-                    entry.IsPacked = isPacked;
-
                     m_dir.Add (entry);
                 }
                 return true;
