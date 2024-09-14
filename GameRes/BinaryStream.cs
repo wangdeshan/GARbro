@@ -170,14 +170,14 @@ namespace GameRes
             return bin;
         }
 
-        internal int FindEoS(int start, int length, Encoding enc)
+        internal int FindEoS (int start, int length, Encoding enc)
         {
             int eos_pos = -1;
             if (enc.IsUtf16())
             {
-                for (int i = start + 1; i < start + length; i += 2)
+                for (int i = start+1; i < start+length; i += 2)
                 {
-                    if (m_buffer[i - 1] == 0 && m_buffer[i] == 0)
+                    if (m_buffer[i-1] == 0 && m_buffer[i] == 0)
                     {
                         eos_pos = i - 1;
                         break;
@@ -186,7 +186,7 @@ namespace GameRes
             }
             else
             {
-                eos_pos = Array.IndexOf<byte>(m_buffer, 0, start, length);
+                eos_pos = Array.IndexOf<byte> (m_buffer, 0, start, length);
             }
             return eos_pos;
         }
