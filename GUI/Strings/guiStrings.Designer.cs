@@ -790,7 +790,7 @@ namespace GARbro.GUI.Strings {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Image {0} x {1} x {2}bpp [{3}].
+        ///   Looks up a localized string similar to Image {0} x {1} x {2}bpp.
         /// </summary>
         public static string MsgImageSize {
             get {

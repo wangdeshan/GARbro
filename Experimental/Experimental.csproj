@@ -220,9 +220,6 @@
   <PropertyGroup Label="YltParsers">
     <Names>ipt</Names>
   </PropertyGroup>
-  <PropertyGroup>
-    <RunPostBuildEvent>OnOutputUpdated</RunPostBuildEvent>
-  </PropertyGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PreBuildEvent>rem perl "$(SolutionDir)inc-revision.pl" "$(ProjectPath)" $(ConfigurationName)
