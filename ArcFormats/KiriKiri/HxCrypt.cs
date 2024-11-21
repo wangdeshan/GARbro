@@ -127,7 +127,7 @@ namespace GameRes.Formats.KiriKiri
             var name_map = new Dictionary<string, string>();
             try
             {
-                FormatCatalog.Instance.ReadFileList (NamesFile, line => {
+                FormatCatalog.Instance.ReadFileList ("HxNames.lst", line => {
                     var name = line.Split (':');  // "hash:name"
                     if (name.Length != 2)
                         return;
@@ -138,6 +138,23 @@ namespace GameRes.Formats.KiriKiri
                 });
             }
             catch (Exception) { }
+
+            if (NamesFile != null && NamesFile != "HxNames.lst"){
+                try
+                {
+                    FormatCatalog.Instance.ReadFileList (NamesFile, line => {
+                        var name = line.Split (':');  // "hash:name"
+                        if (name.Length != 2)
+                            return;
+                        if (name[0].Length == 16)
+                            path_map[name[0]] = name[1];
+                        else if (name[0].Length == 64)
+                            name_map[name[0]] = name[1];
+                    });
+                }
+                catch (Exception) { }
+            }
+
             var entry_info_map = new Dictionary<string, HxEntry>();
             for (var i = 0; i < root_obj.Length; i += 2)
             {
@@ -166,10 +183,18 @@ namespace GameRes.Formats.KiriKiri
                         continue;
                     var entry_info = new HxEntry();
                     if (path_map.TryGetValue (path_hash_str, out string path_str))
+                    {
                         entry_info.Path = path_str;
+                    }else{
+                        entry_info.Path = "UnknownDirName_" + path_hash_str;
+                    }
                     var name_hash_str = BinaryToString (entry_hash);
                     if (name_map.TryGetValue (name_hash_str, out string name_str))
+                    {
                         entry_info.Name = name_str;
+                    }else{
+                        entry_info.Name = "UnknownFileName_" + name_hash_str;
+                    }
                     entry_info.Key = (long)entry_key;
                     var id = (uint)entry_id;
                     entry_info.Id = (long)entry_id;
