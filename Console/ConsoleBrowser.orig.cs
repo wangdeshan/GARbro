@@ -19,7 +19,6 @@ namespace GARbro
         private string      m_arc_name;
         private ImageFormat m_image_format;
         private bool        m_extract_all;
-        private bool        breakcmd = false;
 
         void ListFormats ()
         {
@@ -79,20 +78,18 @@ namespace GARbro
             int argn = 0;
             while (argn < args.Length)
             {
-                switch (args[argn])
+                if (args[argn].Equals ("-l"))
                 {
-                case "-l":
-                case "--list-format":
                     ListFormats();
                     return;
-
-                case "-t":
-                case "--test-archive":
+                }
+                else if (args[argn].Equals ("-t"))
+                {
                     TestArc (args);
                     return;
-
-                case "-c":
-                case "--convert-image":
+                }
+                else if (args[argn].Equals ("-c"))
+                {
                     if (argn+1 >= args.Length)
                     {
                         Usage();
@@ -106,10 +103,9 @@ namespace GARbro
                         return;
                     }
                     argn += 2;
-                    break;
-
-                case "-x":
-                case "--extract-all":
+                }
+                else if (args[argn].Equals ("-x"))
+                {
                     m_extract_all = true;
                     ++argn;
                     if (args.Length <= argn)
@@ -117,14 +113,11 @@ namespace GARbro
                         Usage();
                         return;
                     }
-					break;
-				case "--":
-				default:
-					breakcmd = true; 
-					break;
-				}
-				
-				if (breakcmd) break;
+                }
+                else
+                {
+                    break;
+                }
             }
             if (argn >= args.Length)
             {
